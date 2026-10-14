@@ -91,6 +91,20 @@ export async function storageCreateUpload(
   return { uploadUrl, key, url: `/manus-storage/${key}`, contentType };
 }
 
+export function cloudinaryCreateUpload(contentType = "application/octet-stream") {
+  const cloudName = ENV.cloudinaryCloudName;
+  const uploadPreset = ENV.cloudinaryUploadPreset;
+  if (!cloudName || !uploadPreset) {
+    throw new Error("Cloudinary config missing: set CLOUDINARY_CLOUD_NAME and CLOUDINARY_UPLOAD_PRESET");
+  }
+  const resourceType = contentType.startsWith("video/") ? "video" : "raw";
+  return {
+    uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,
+    uploadPreset,
+    contentType,
+  };
+}
+
 export async function storageGet(relKey: string): Promise<{ key: string; url: string }> {
   const key = normalizeKey(relKey);
   return { key, url: `/manus-storage/${key}` };

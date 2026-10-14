@@ -79,6 +79,12 @@ var ENV = {
   },
   get forgeApiKey() {
     return process.env.MANUS_API_KEY ?? "";
+  },
+  get cloudinaryCloudName() {
+    return process.env.CLOUDINARY_CLOUD_NAME ?? "";
+  },
+  get cloudinaryUploadPreset() {
+    return process.env.CLOUDINARY_UPLOAD_PRESET ?? "";
   }
 };
 
@@ -127,21 +133,18 @@ async function storagePut(relKey, data, contentType = "application/octet-stream"
   }
   return { key, url: `/manus-storage/${key}` };
 }
-async function storageCreateUpload(relKey, contentType = "application/octet-stream") {
-  const { forgeUrl, forgeKey } = getForgeConfig();
-  const key = appendHashSuffix(normalizeKey(relKey));
-  const presignUrl = new URL("v1/storage/presign/put", forgeUrl + "/");
-  presignUrl.searchParams.set("path", key);
-  const response = await fetch(presignUrl, {
-    headers: { Authorization: `Bearer ${forgeKey}` }
-  });
-  if (!response.ok) {
-    const msg = await response.text().catch(() => response.statusText);
-    throw new Error(`Storage presign failed (${response.status}): ${msg}`);
+function cloudinaryCreateUpload(contentType = "application/octet-stream") {
+  const cloudName = ENV.cloudinaryCloudName;
+  const uploadPreset = ENV.cloudinaryUploadPreset;
+  if (!cloudName || !uploadPreset) {
+    throw new Error("Cloudinary config missing: set CLOUDINARY_CLOUD_NAME and CLOUDINARY_UPLOAD_PRESET");
   }
-  const { url: uploadUrl } = await response.json();
-  if (!uploadUrl) throw new Error("Forge returned empty presign URL");
-  return { uploadUrl, key, url: `/manus-storage/${key}`, contentType };
+  const resourceType = contentType.startsWith("video/") ? "video" : "raw";
+  return {
+    uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,
+    uploadPreset,
+    contentType
+  };
 }
 
 // server/db.ts
@@ -1044,7 +1047,7 @@ var appRouter = router({
     files: contentProcedure.query(() => listFiles()),
     uploadTarget: contentProcedure.input(z2.object({ fileName: z2.string().min(1).max(255), contentType: z2.string().max(120), size: z2.number().int().positive().max(500 * 1024 * 1024) })).mutation(({ input }) => {
       const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-120) || "file";
-      return storageCreateUpload(`alpha/files/${Date.now()}-${safeName}`, input.contentType || "application/octet-stream");
+      return cloudinaryCreateUpload(input.contentType || "application/octet-stream");
     }),
     uploadFile: contentProcedure.input(z2.object({ fileName: z2.string().min(1).max(255), contentType: z2.string().max(120), data: z2.string().min(1), size: z2.number().int().positive().max(25 * 1024 * 1024) })).mutation(({ input }) => uploadEducationalFile(input)),
     createFile: contentProcedure.input(fileInput).mutation(({ input }) => createFile(input)),
@@ -1067,7 +1070,7 @@ var appRouter = router({
     videos: contentProcedure.query(() => listVideos()),
     videoUploadTarget: contentProcedure.input(z2.object({ fileName: z2.string().min(1).max(255), contentType: z2.string().max(120), size: z2.number().int().positive().max(500 * 1024 * 1024) })).mutation(({ input }) => {
       const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-120) || "video";
-      return storageCreateUpload(`alpha/videos/${Date.now()}-${safeName}`, input.contentType || "video/mp4");
+      return cloudinaryCreateUpload(input.contentType || "video/mp4");
     }),
     createVideo: contentProcedure.input(z2.object({ title: z2.string().min(2), description: z2.string().optional().nullable(), videoUrl: z2.string().min(1).refine((value) => value.startsWith("/") || /^https?:\/\//.test(value), "\u0623\u062F\u062E\u0644 \u0631\u0627\u0628\u0637 \u0641\u064A\u062F\u064A\u0648 \u0635\u062D\u064A\u062D"), thumbnailUrl: z2.string().min(1).refine((value) => value.startsWith("/") || /^https?:\/\//.test(value), "\u0623\u062F\u062E\u0644 \u0631\u0627\u0628\u0637 \u0635\u0648\u0631\u0629 \u0635\u062D\u064A\u062D").optional().nullable(), isPublished: z2.number().int().min(0).max(1) })).mutation(({ input }) => createVideo(input)),
     visitStats: adminProcedure.query(() => getVisitStats()),

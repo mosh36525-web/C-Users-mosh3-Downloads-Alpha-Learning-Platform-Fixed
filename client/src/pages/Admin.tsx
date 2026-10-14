@@ -45,10 +45,15 @@ function QuestionEditor({quizId,rows,loading}:{quizId:number;rows:any[];loading:
   return <aside className="editor-card quiz-question-editor"><div className="editor-head"><div><h3>أسئلة الكويز</h3><small>11 سؤالًا · الخانات أ، ب، ج، د جاهزة لكل سؤال</small></div><Check size={18}/></div>{draft.map((question,index)=><div className="question-edit-card" key={index}><div className="question-edit-head"><strong>السؤال {index+1}</strong><label>الإجابة الصحيحة<select value={question.correctOption} onChange={e=>update(index,"correctOption",e.target.value)}><option value="A">أ</option><option value="B">ب</option><option value="C">ج</option><option value="D">د</option></select></label></div><label className="question-upload"><ImagePlus size={15}/> إضافة صورة للسؤال<input type="file" accept="image/*" onChange={e=>upload(index,e.target.files?.[0])}/></label>{question.imageUrl&&<img className="question-edit-preview" src={question.imageUrl} alt="معاينة السؤال"/>}<div className="question-options-edit"><label className="question-option-edit"><b>أ</b><input aria-label="الخيار أ" placeholder="اكتب نص الخيار" value={question.optionA} onChange={e=>update(index,"optionA",e.target.value)}/></label><label className="question-option-edit"><b>ب</b><input aria-label="الخيار ب" placeholder="اكتب نص الخيار" value={question.optionB} onChange={e=>update(index,"optionB",e.target.value)}/></label><label className="question-option-edit"><b>ج</b><input aria-label="الخيار ج" placeholder="اكتب نص الخيار" value={question.optionC} onChange={e=>update(index,"optionC",e.target.value)}/></label><label className="question-option-edit"><b>د</b><input aria-label="الخيار د" placeholder="اكتب نص الخيار" value={question.optionD} onChange={e=>update(index,"optionD",e.target.value)}/></label></div></div>)}<button className="gold-button full" disabled={save.isPending} onClick={()=>save.mutate({quizId,questions:draft.map((q,index)=>({position:index+1,prompt:`سؤال ${index+1}`,imageUrl:q.imageUrl||null,optionA:q.optionA,optionB:q.optionB,optionC:q.optionC,optionD:q.optionD,correctOption:q.correctOption}))})}><Check size={16}/> حفظ الأسئلة الـ11</button>{message&&<p className="editor-feedback">{message}</p>}</aside>;
 }
 
-async function putToSignedStorage(target: { uploadUrl: string; url: string; contentType?: string }, file: File) {
-  const response = await fetch(target.uploadUrl, { method: "PUT", headers: { "Content-Type": target.contentType || file.type || "application/octet-stream" }, body: file });
-  if (!response.ok) throw new Error(`فشل التخزين (${response.status})`);
-  return target.url;
+async function putToSignedStorage(target: { uploadUrl: string; uploadPreset: string; contentType?: string }, file: File) {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("upload_preset", target.uploadPreset);
+  form.append("folder", "alpha-platform");
+  const response = await fetch(target.uploadUrl, { method: "POST", body: form });
+  const result = await response.json().catch(() => null) as { secure_url?: string; error?: { message?: string } } | null;
+  if (!response.ok || !result?.secure_url) throw new Error(result?.error?.message || `فشل التخزين (${response.status})`);
+  return result.secure_url;
 }
 
 function VideosPanel({rows}:{rows:any[]}){

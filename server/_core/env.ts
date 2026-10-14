@@ -9,4 +9,6 @@ export const ENV = {
   get isProduction() { return process.env.NODE_ENV === "production"; },
   get forgeApiUrl() { return process.env.MANUS_API_URL ?? ""; },
   get forgeApiKey() { return process.env.MANUS_API_KEY ?? ""; },
+  get cloudinaryCloudName() { return process.env.CLOUDINARY_CLOUD_NAME ?? ""; },
+  get cloudinaryUploadPreset() { return process.env.CLOUDINARY_UPLOAD_PRESET ?? ""; },
 };
