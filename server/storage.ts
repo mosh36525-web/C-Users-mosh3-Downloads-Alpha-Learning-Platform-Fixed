@@ -97,7 +97,8 @@ export function cloudinaryCreateUpload(contentType = "application/octet-stream")
   if (!cloudName || !uploadPreset) {
     throw new Error("Cloudinary config missing: set CLOUDINARY_CLOUD_NAME and CLOUDINARY_UPLOAD_PRESET");
   }
-  const resourceType = contentType.startsWith("video/") ? "video" : "raw";
+  const resourceType = contentType.startsWith("video/") ? const resourceType = contentType.startsWith("video/") ? "video" : "auto";
+"video" : "raw";
   return {
     uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,
     uploadPreset,
