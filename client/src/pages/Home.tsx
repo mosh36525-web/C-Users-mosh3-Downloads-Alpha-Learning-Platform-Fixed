@@ -1,4 +1,5 @@
 import type React from "react";
+import { useState } from "react";
 import { ArrowLeft, ArrowUpLeft, BookOpen, ChevronLeft, FolderOpen, Headphones, HelpCircle, Info, Layers3, LogIn, MessageCircle, Moon, ShieldCheck, Sparkles, Sun } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -17,10 +18,19 @@ export default function Home() {
   const files = trpc.content.files.useQuery(undefined, { enabled: Boolean(user) });
   const videos = trpc.content.videos.useQuery(undefined, { enabled: Boolean(user) });
   const progress = trpc.student.dashboard.useQuery(undefined, { enabled: Boolean(user) });
-  const branding = trpc.platform.settings.useQuery();
+   const branding = trpc.platform.settings.useQuery();
   const platform = branding.data;
   const cards = content.data ?? [];
   const quote = getDailyQuote();
+
+  const [selectedVideo, setSelectedVideo] = useState<any>(null);
+
+  const youtubeId = (url: string) =>
+    url.match(
+      /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/,
+    )?.[1] ?? null;
+
+
   return <div className="alpha-page" dir="rtl" style={{"--brand-font": platform?.fontFamily ?? "IBM Plex Sans Arabic", "--brand-primary": platform?.primaryColor ?? "#f2c75d", "--brand-background": platform?.backgroundColor ?? "#090b0e"} as React.CSSProperties}>
     <header className="site-header">
       <div className="header-inner">
@@ -54,7 +64,7 @@ export default function Home() {
       </section>
       <section id="tracks" className="feature-band container-alpha"><div><span className="section-kicker">اختبر نفسك</span><h2>كويزات الأقسام،<br/><em>تقدم أكبر.</em></h2></div><div className="band-steps">{(quizzes.data??[]).slice(0,3).map((quiz,index)=><div key={quiz.id}><span>0{index+1}</span><p>{quiz.section}<br/><small>{quiz.title}</small></p></div>)}{!quizzes.isLoading&&!quizzes.data?.length&&<div><span>—</span><p>لا توجد كويزات منشورة<br/><small>ستظهر هنا تلقائيًا</small></p></div>}</div><Link href="/quizzes" className="round-arrow"><ArrowLeft size={21}/></Link></section>
 
-      {user && <section id="explanations" className="explanation-section container-alpha"><div className="section-heading compact"><div><span className="section-kicker">شرح الأقسام</span><h2>فيديوهات تساعدك<br/><em>على الفهم والمراجعة.</em></h2></div><p>شروحات مرئية للكويزات والملفات، تُضاف تلقائيًا من لوحة التحكم.</p></div><div className="explanation-grid">{(videos.data ?? []).map(video => <a className="explanation-card" key={video.id} href={video.videoUrl} target="_blank" rel="noreferrer">{video.thumbnailUrl ? <img src={video.thumbnailUrl} alt=""/> : <div className="video-placeholder"><span>▶</span></div>}<div><span className="card-label">شرح قسم</span><h3>{video.title}</h3><p>{video.description ?? "شرح مختصر يساعدك على مراجعة المحتوى."}</p></div></a>)}{!videos.isLoading && !videos.data?.length && <div className="empty-state">ستظهر فيديوهات الشرح هنا بعد نشرها من لوحة التحكم.</div>}</div></section>}
+      {user && <section id="explanations" className="explanation-section container-alpha"><div className="section-heading compact"><div><span className="section-kicker">شرح الأقسام</span><h2>فيديوهات تساعدك<br/><em>على الفهم والمراجعة.</em></h2></div><p>شروحات مرئية للكويزات والملفات، تُضاف تلقائيًا من لوحة التحكم.</p></div><div className="explanation-grid">{(videos.data ?? []).map(video => <button className="explanation-card explanation-card-button" key={video.id} onClick={() => setSelectedVideo(video)}>{video.thumbnailUrl ? <img src={video.thumbnailUrl} alt=""/> : <div className="video-placeholder"><span>▶</span></div>}<div><span className="card-label">شرح قسم</span><h3>{video.title}</h3><p>{video.description ?? "شرح مختصر يساعدك على مراجعة المحتوى."}</p></div></button>)}{!videos.isLoading && !videos.data?.length && <div className="empty-state">ستظهر فيديوهات الشرح هنا بعد نشرها من لوحة التحكم.</div>}</div>{selectedVideo && <div className="inline-video-player"><div className="inline-video-head"><div><span className="section-kicker">يعمل داخل الصفحة</span><h3>{selectedVideo.title}</h3></div><button className="outline-action" onClick={() => setSelectedVideo(null)}>إغلاق</button></div>{youtubeId(selectedVideo.videoUrl) ? <iframe src={`https://www.youtube.com/embed/${youtubeId(selectedVideo.videoUrl)}`} title={selectedVideo.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen/> : <video src={selectedVideo.videoUrl} controls playsInline autoPlay preload="metadata"/>}<p>{selectedVideo.description ?? "شرح مختصر يساعدك على مراجعة المحتوى."}</p></div>}</section>}
       <section id="library" className="file-list-section container-alpha"><div className="section-heading compact"><div><span className="section-kicker">المكتبة</span><h2>ملفات جاهزة<br/><em>للمراجعة.</em></h2></div><Link className="inline-link" href="/app">شاهد الكل <ArrowLeft size={15}/></Link></div><div className="file-list">{user ? (files.data ?? []).slice(0,3).map((file) => <div className="file-row" key={file.id}><div className="file-icon"><Layers3 size={18}/></div><div><strong>{file.title}</strong><small>{file.kind} · {file.size} · {file.pages} صفحة</small></div><ChevronLeft size={17}/></div>) : <div className="empty-state">سجّل الدخول للوصول إلى الملفات التعليمية والكويزات.</div>}</div></section>
     </main>
     <footer className="site-footer container-alpha"><div className="brand-lockup"><div className="brand-mark brand-image"><img src={platform?.logoUrl ?? "/brand/alpha-owner.png"} alt="Alpha" /></div><div><strong>{platform?.platformName ?? "ALPHA"}</strong><small>منصة ألفا في أقسام الكمي</small></div></div><span>طريقك الأقصر والأفضل لإتقان الكمي</span><span>© 2026 Alpha</span></footer>
