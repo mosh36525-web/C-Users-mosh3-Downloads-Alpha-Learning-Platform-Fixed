@@ -1037,42 +1037,42 @@ var appRouter = router({
     users: adminProcedure.query(() => getAllUsers()),
     updateUser: ownerProcedure.input(z2.object({ id: z2.number().int(), role: roleInput, status: z2.enum(["active", "suspended"]) })).mutation(({ input }) => updateUserAccess(input.id, input.role, input.status)),
     updateUserStatus: platformManagerProcedure.input(z2.object({ id: z2.number().int(), status: z2.enum(["active", "suspended"]) })).mutation(({ input }) => updateUserStatus(input.id, input.status)),
-    content: contentProcedure.query(() => listContent()),
-    createContent: contentProcedure.input(contentInput).mutation(({ input }) => createContent(input)),
-    updateContent: contentProcedure.input(contentInput.extend({ id: z2.number().int() })).mutation(({ input }) => {
+    content: ownerProcedure.query(() => listContent()),
+    createContent: ownerProcedure.input(contentInput).mutation(({ input }) => createContent(input)),
+    updateContent: ownerProcedure.input(contentInput.extend({ id: z2.number().int() })).mutation(({ input }) => {
       const { id, ...data } = input;
       return updateContent(id, data);
     }),
-    deleteContent: contentProcedure.input(z2.object({ id: z2.number().int() })).mutation(({ input }) => deleteContent(input.id)),
-    files: contentProcedure.query(() => listFiles()),
-    uploadTarget: contentProcedure.input(z2.object({ fileName: z2.string().min(1).max(255), contentType: z2.string().max(120), size: z2.number().int().positive().max(500 * 1024 * 1024) })).mutation(({ input }) => {
+    deleteContent: ownerProcedure.input(z2.object({ id: z2.number().int() })).mutation(({ input }) => deleteContent(input.id)),
+    files: ownerProcedure.query(() => listFiles()),
+    uploadTarget: ownerProcedure.input(z2.object({ fileName: z2.string().min(1).max(255), contentType: z2.string().max(120), size: z2.number().int().positive().max(500 * 1024 * 1024) })).mutation(({ input }) => {
       const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-120) || "file";
       return cloudinaryCreateUpload(input.contentType || "application/octet-stream");
     }),
-    uploadFile: contentProcedure.input(z2.object({ fileName: z2.string().min(1).max(255), contentType: z2.string().max(120), data: z2.string().min(1), size: z2.number().int().positive().max(25 * 1024 * 1024) })).mutation(({ input }) => uploadEducationalFile(input)),
-    createFile: contentProcedure.input(fileInput).mutation(({ input }) => createFile(input)),
-    updateFile: contentProcedure.input(fileInput.extend({ id: z2.number().int() })).mutation(({ input }) => {
+    uploadFile: ownerProcedure.input(z2.object({ fileName: z2.string().min(1).max(255), contentType: z2.string().max(120), data: z2.string().min(1), size: z2.number().int().positive().max(25 * 1024 * 1024) })).mutation(({ input }) => uploadEducationalFile(input)),
+    createFile: ownerProcedure.input(fileInput).mutation(({ input }) => createFile(input)),
+    updateFile: ownerProcedure.input(fileInput.extend({ id: z2.number().int() })).mutation(({ input }) => {
       const { id, ...data } = input;
       return updateFile(id, data);
     }),
-    deleteFile: contentProcedure.input(z2.object({ id: z2.number().int() })).mutation(({ input }) => deleteFile(input.id)),
-    quizzes: contentProcedure.query(() => listQuizzes()),
-    quizQuestions: contentProcedure.input(z2.object({ quizId: z2.number().int() })).query(({ input }) => getQuizQuestionsForAdmin(input.quizId)),
-    saveQuizQuestions: contentProcedure.input(z2.object({ quizId: z2.number().int(), questions: z2.array(z2.object({ position: z2.number().int().min(1).max(11), prompt: z2.string().min(1), imageUrl: z2.string().optional().nullable(), optionA: z2.string().min(1), optionB: z2.string().min(1), optionC: z2.string().min(1), optionD: z2.string().min(1), correctOption: z2.enum(["A", "B", "C", "D"]) }).strict()).length(11) })).mutation(({ input }) => replaceQuizQuestions(input.quizId, input.questions.map((question) => ({ ...question, quizId: input.quizId })))),
-    addQuiz: contentProcedure.input(z2.object({ title: z2.string().trim().min(2).max(255), section: z2.string().trim().min(1).max(80), isPublished: z2.number().int().min(0).max(1) })).mutation(({ input }) => createQuiz({ title: input.title, section: input.section, questions: 11, isPublished: input.isPublished })),
-    createQuiz: contentProcedure.input(quizInput).mutation(({ input }) => createQuiz(input)),
-    updateQuiz: contentProcedure.input(quizInput.extend({ id: z2.number().int() })).mutation(({ input }) => {
+    deleteFile: ownerProcedure.input(z2.object({ id: z2.number().int() })).mutation(({ input }) => deleteFile(input.id)),
+    quizzes: ownerProcedure.query(() => listQuizzes()),
+    quizQuestions: ownerProcedure.input(z2.object({ quizId: z2.number().int() })).query(({ input }) => getQuizQuestionsForAdmin(input.quizId)),
+    saveQuizQuestions: ownerProcedure.input(z2.object({ quizId: z2.number().int(), questions: z2.array(z2.object({ position: z2.number().int().min(1).max(11), prompt: z2.string().min(1), imageUrl: z2.string().optional().nullable(), optionA: z2.string().min(1), optionB: z2.string().min(1), optionC: z2.string().min(1), optionD: z2.string().min(1), correctOption: z2.enum(["A", "B", "C", "D"]) }).strict()).length(11) })).mutation(({ input }) => replaceQuizQuestions(input.quizId, input.questions.map((question) => ({ ...question, quizId: input.quizId })))),
+    addQuiz: ownerProcedure.input(z2.object({ title: z2.string().trim().min(2).max(255), section: z2.string().trim().min(1).max(80), isPublished: z2.number().int().min(0).max(1) })).mutation(({ input }) => createQuiz({ title: input.title, section: input.section, questions: 11, isPublished: input.isPublished })),
+    createQuiz: ownerProcedure.input(quizInput).mutation(({ input }) => createQuiz(input)),
+    updateQuiz: ownerProcedure.input(quizInput.extend({ id: z2.number().int() })).mutation(({ input }) => {
       const { id, ...data } = input;
       return updateQuiz(id, data);
     }),
-    deleteQuiz: contentProcedure.input(z2.object({ id: z2.number().int() })).mutation(({ input }) => deleteQuiz(input.id)),
+    deleteQuiz: ownerProcedure.input(z2.object({ id: z2.number().int() })).mutation(({ input }) => deleteQuiz(input.id)),
     supportSummary: supportProcedure.query(() => getAllUsers()),
-    videos: contentProcedure.query(() => listVideos()),
-    videoUploadTarget: contentProcedure.input(z2.object({ fileName: z2.string().min(1).max(255), contentType: z2.string().max(120), size: z2.number().int().positive().max(500 * 1024 * 1024) })).mutation(({ input }) => {
+    videos: ownerProcedure.query(() => listVideos()),
+    videoUploadTarget: ownerProcedure.input(z2.object({ fileName: z2.string().min(1).max(255), contentType: z2.string().max(120), size: z2.number().int().positive().max(500 * 1024 * 1024) })).mutation(({ input }) => {
       const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-120) || "video";
       return cloudinaryCreateUpload(input.contentType || "video/mp4");
     }),
-    createVideo: contentProcedure.input(z2.object({ title: z2.string().min(2), description: z2.string().optional().nullable(), videoUrl: z2.string().min(1).refine((value) => value.startsWith("/") || /^https?:\/\//.test(value), "\u0623\u062F\u062E\u0644 \u0631\u0627\u0628\u0637 \u0641\u064A\u062F\u064A\u0648 \u0635\u062D\u064A\u062D"), thumbnailUrl: z2.string().min(1).refine((value) => value.startsWith("/") || /^https?:\/\//.test(value), "\u0623\u062F\u062E\u0644 \u0631\u0627\u0628\u0637 \u0635\u0648\u0631\u0629 \u0635\u062D\u064A\u062D").optional().nullable(), isPublished: z2.number().int().min(0).max(1) })).mutation(({ input }) => createVideo(input)),
+    createVideo: ownerProcedure.input(z2.object({ title: z2.string().min(2), description: z2.string().optional().nullable(), videoUrl: z2.string().min(1).refine((value) => value.startsWith("/") || /^https?:\/\//.test(value), "\u0623\u062F\u062E\u0644 \u0631\u0627\u0628\u0637 \u0641\u064A\u062F\u064A\u0648 \u0635\u062D\u064A\u062D"), thumbnailUrl: z2.string().min(1).refine((value) => value.startsWith("/") || /^https?:\/\//.test(value), "\u0623\u062F\u062E\u0644 \u0631\u0627\u0628\u0637 \u0635\u0648\u0631\u0629 \u0635\u062D\u064A\u062D").optional().nullable(), isPublished: z2.number().int().min(0).max(1) })).mutation(({ input }) => createVideo(input)),
     visitStats: adminProcedure.query(() => getVisitStats()),
     visitLog: adminProcedure.query(() => listVisitLog()),
     resetVisits: ownerProcedure.mutation(() => resetVisitLog())
