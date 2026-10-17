@@ -35,7 +35,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 // drizzle/schema.ts
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 var userRoleValues = ["user", "owner", "platform_manager", "content_moderator", "support_moderator"];
-var users = mysqlTable("users", { id: int("id").autoincrement().primaryKey(), openId: varchar("openId", { length: 64 }).notNull().unique(), name: text("name"), email: varchar("email", { length: 320 }), passwordHash: text("passwordHash"), emailVerified: int("emailVerified").default(0).notNull(), verificationToken: varchar("verificationToken", { length: 128 }), verificationExpiresAt: timestamp("verificationExpiresAt"), loginMethod: varchar("loginMethod", { length: 64 }), role: mysqlEnum("role", userRoleValues).default("user").notNull(), status: mysqlEnum("status", ["active", "suspended"]).default("active").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(), lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull() });
+var users = mysqlTable("users", { id: int("id").autoincrement().primaryKey(), openId: varchar("openId", { length: 64 }).notNull().unique(), name: text("name"), email: varchar("email", { length: 320 }), passwordHash: text("passwordHash"), emailVerified: int("emailVerified").default(0).notNull(), verificationToken: varchar("verificationToken", { length: 128 }), verificationExpiresAt: timestamp("verificationExpiresAt"), resetToken: varchar("resetToken", { length: 128 }), resetExpiresAt: timestamp("resetExpiresAt"), loginMethod: varchar("loginMethod", { length: 64 }), role: mysqlEnum("role", userRoleValues).default("user").notNull(), status: mysqlEnum("status", ["active", "suspended"]).default("active").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(), lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull() });
 var contentItems = mysqlTable("contentItems", { id: int("id").autoincrement().primaryKey(), title: varchar("title", { length: 255 }).notNull(), description: text("description").notNull(), category: varchar("category", { length: 80 }).notNull(), duration: varchar("duration", { length: 80 }).notNull(), lessons: int("lessons").default(0).notNull(), accent: varchar("accent", { length: 32 }).default("gold").notNull(), isPublished: int("isPublished").default(1).notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() });
 var educationalFiles = mysqlTable("educationalFiles", { id: int("id").autoincrement().primaryKey(), contentId: int("contentId"), title: varchar("title", { length: 255 }).notNull(), kind: varchar("kind", { length: 80 }).notNull(), size: varchar("size", { length: 40 }).notNull(), pages: int("pages").default(0).notNull(), downloadUrl: text("downloadUrl"), isPublished: int("isPublished").default(1).notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() });
 var quizzes = mysqlTable("quizzes", { id: int("id").autoincrement().primaryKey(), title: varchar("title", { length: 255 }).notNull(), section: varchar("section", { length: 80 }).notNull().default("\u0642\u0633\u0645 1"), coverImageUrl: text("coverImageUrl"), questions: int("questions").default(11).notNull(), isPublished: int("isPublished").default(1).notNull(), createdAt: timestamp("createdAt").defaultNow().notNull() });
@@ -216,6 +216,26 @@ async function createPasswordUser(input) {
   const openId = `email:${input.email}`;
   await db.insert(users).values({ openId, name: input.name, email: input.email, passwordHash: input.passwordHash, emailVerified: 0, loginMethod: "email", role: input.email === OWNER_EMAIL ? "owner" : "user", status: "active", lastSignedIn: /* @__PURE__ */ new Date() });
   return getUserByOpenId(openId);
+}
+async function createPasswordReset(email, tokenHash, expiresAt) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const user = await getUserByEmail(email);
+  if (!user?.passwordHash) return false;
+  await db.update(users).set({ resetToken: tokenHash, resetExpiresAt: expiresAt }).where(eq(users.id, user.id));
+  return true;
+}
+async function getUserByResetToken(tokenHash) {
+  const db = await getDb();
+  if (!db) return void 0;
+  const rows = await db.select().from(users).where(eq(users.resetToken, tokenHash)).limit(1);
+  const user = rows[0];
+  return user && user.resetExpiresAt && new Date(user.resetExpiresAt).getTime() > Date.now() ? user : void 0;
+}
+async function updatePasswordFromReset(id, passwordHash) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.update(users).set({ passwordHash, resetToken: null, resetExpiresAt: null, emailVerified: 1 }).where(eq(users.id, id));
 }
 async function markPasswordUserSignedIn(id) {
   const db = await getDb();
@@ -859,7 +879,7 @@ function publicPlatformScript(env = process.env) {
 
 // server/routers.ts
 import { z as z2 } from "zod";
-import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 
 // server/_core/systemRouter.ts
@@ -1033,6 +1053,31 @@ var appRouter = router({
       const token = await sdk.createSessionToken(user.openId, { name: user.name ?? "" });
       ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: 31536e6 });
       return signedIn;
+    }),
+    requestPasswordReset: publicProcedure.input(z2.object({ email: emailInput })).mutation(async ({ input }) => {
+      const generic = { success: true, message: "\u0625\u0630\u0627 \u0643\u0627\u0646 \u0627\u0644\u0628\u0631\u064A\u062F \u0645\u0633\u062C\u0644\u064B\u0627\u060C \u0633\u062A\u0635\u0644\u0643 \u0631\u0633\u0627\u0644\u0629 \u062A\u062D\u062A\u0648\u064A \u0639\u0644\u0649 \u0631\u0627\u0628\u0637 \u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631." };
+      const user = await getUserByEmail(input.email);
+      if (!user?.passwordHash) return generic;
+      const token = randomBytes(32).toString("hex");
+      const tokenHash = createHash("sha256").update(token).digest("hex");
+      await createPasswordReset(input.email, tokenHash, new Date(Date.now() + 30 * 60 * 1e3));
+      const appUrl = (process.env.APP_URL || "https://alpha-2030.vercel.app").replace(/\/$/, "");
+      const resetUrl = `${appUrl}/account?reset=${token}`;
+      const apiKey = process.env.RESEND_API_KEY;
+      if (!apiKey) throw new Error("\u0645\u064A\u0632\u0629 \u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u062A\u062D\u062A\u0627\u062C \u0625\u0636\u0627\u0641\u0629 RESEND_API_KEY \u0641\u064A Vercel");
+      const from = process.env.RESEND_FROM_EMAIL || "Alpha Learning <onboarding@resend.dev>";
+      const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` }, body: JSON.stringify({ from, to: [input.email], subject: "\u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 - Alpha Learning", html: `<div dir="rtl" style="font-family:Arial;line-height:1.8"><h2>\u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631</h2><p>\u0627\u0636\u063A\u0637 \u0639\u0644\u0649 \u0627\u0644\u0632\u0631 \u0627\u0644\u062A\u0627\u0644\u064A \u0644\u0625\u0646\u0634\u0627\u0621 \u0643\u0644\u0645\u0629 \u0645\u0631\u0648\u0631 \u062C\u062F\u064A\u062F\u0629. \u0627\u0644\u0631\u0627\u0628\u0637 \u0635\u0627\u0644\u062D \u0644\u0645\u062F\u0629 30 \u062F\u0642\u064A\u0642\u0629.</p><p><a href="${resetUrl}" style="display:inline-block;background:#f2c75d;color:#111;padding:12px 22px;border-radius:8px;text-decoration:none">\u0625\u0646\u0634\u0627\u0621 \u0643\u0644\u0645\u0629 \u0645\u0631\u0648\u0631 \u062C\u062F\u064A\u062F\u0629</a></p><p>\u0625\u0630\u0627 \u0644\u0645 \u062A\u0637\u0644\u0628 \u0630\u0644\u0643\u060C \u062A\u062C\u0627\u0647\u0644 \u0627\u0644\u0631\u0633\u0627\u0644\u0629.</p></div>` }) });
+      if (!response.ok) throw new Error("\u062A\u0639\u0630\u0631 \u0625\u0631\u0633\u0627\u0644 \u0631\u0633\u0627\u0644\u0629 \u0627\u0644\u0627\u0633\u062A\u0639\u0627\u062F\u0629\u060C \u062A\u062D\u0642\u0642 \u0645\u0646 \u0625\u0639\u062F\u0627\u062F\u0627\u062A Resend");
+      return generic;
+    }),
+    resetPassword: publicProcedure.input(z2.object({ token: z2.string().min(40), password: passwordInput })).mutation(async ({ ctx, input }) => {
+      const tokenHash = createHash("sha256").update(input.token).digest("hex");
+      const user = await getUserByResetToken(tokenHash);
+      if (!user) throw new Error("\u0631\u0627\u0628\u0637 \u0627\u0644\u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D \u0623\u0648 \u0627\u0646\u062A\u0647\u062A \u0635\u0644\u0627\u062D\u064A\u062A\u0647");
+      await updatePasswordFromReset(user.id, await hashPassword(input.password));
+      const session = await sdk.createSessionToken(user.openId, { name: user.name ?? "" });
+      ctx.res.cookie(COOKIE_NAME, session, { ...getSessionCookieOptions(ctx.req), maxAge: 31536e6 });
+      return { success: true };
     }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const opts = getSessionCookieOptions(ctx.req);

@@ -4,7 +4,7 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
+import Home from "./pages/home";
 import Admin from "./pages/Admin";
 import Library from "./pages/Library";
 import Quizzes from "./pages/Quizzes";
