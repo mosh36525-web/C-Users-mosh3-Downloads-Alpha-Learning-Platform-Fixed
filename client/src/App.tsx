@@ -4,7 +4,7 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
+import Home from "./pages/home";
 import Admin from "./pages/Admin";
 import Library from "./pages/Library";
 import Quizzes from "./pages/Quizzes";
@@ -23,4 +23,3 @@ function Router() { return <Switch><Route path="/" component={Home} /><Route pat
 function BrandIconSync() { const branding=trpc.platform.settings.useQuery(); useEffect(()=>{ const icon=document.querySelector<HTMLLinkElement>("#app-favicon"); const cached=window.localStorage.getItem("alpha-favicon-url"); if(icon && cached) icon.href=cached; },[]); useEffect(()=>{ const icon=document.querySelector<HTMLLinkElement>("#app-favicon"); const next=branding.data?.faviconUrl; if(icon && next) { icon.href=next; window.localStorage.setItem("alpha-favicon-url",next); } if(branding.data?.platformName) document.title=branding.data.platformName; },[branding.data]); return null; }
 function VisitTracker() { const { user } = useAuth(); const visit = trpc.analytics.recordVisit.useMutation(); useEffect(() => { const key="alpha-device-id"; const deviceHash=localStorage.getItem(key) ?? crypto.randomUUID().replaceAll("-",""); localStorage.setItem(key,deviceHash); void visit.mutate({deviceHash,path:window.location.pathname,userId:user?.id ?? null,name:user?.name ?? null,email:user?.email ?? null}); }, [user?.id]); return null; }
 export default function App() { return <ErrorBoundary><ThemeProvider defaultTheme="dark" switchable><TooltipProvider><Toaster /><VisitTracker /><BrandIconSync /><GlobalBack /><AccessibilityTools /><Router /></TooltipProvider></ThemeProvider></ErrorBoundary>; }
-
