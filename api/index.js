@@ -484,6 +484,18 @@ async function createVideo(input) {
   if (!db) throw new Error("Database is not available");
   await db.insert(videoLessons).values(input);
 }
+async function updateVideo(id, input) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.update(videoLessons).set(input).where(eq(videoLessons.id, id));
+  return { success: true };
+}
+async function deleteVideo(id) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.delete(videoLessons).where(eq(videoLessons.id, id));
+  return { success: true };
+}
 async function listVisitLog() {
   const db = await getDb();
   return db ? db.select().from(visitLog).orderBy(desc(visitLog.lastVisitedAt)).limit(100) : [];
@@ -998,6 +1010,7 @@ async function verifyPassword(password, stored) {
 var contentInput = z2.object({ title: z2.string().min(2).max(255), description: z2.string().min(2), category: z2.string().min(1).max(80), duration: z2.string().min(1).max(80), lessons: z2.number().int().min(0).max(999), accent: z2.enum(["gold", "blue", "violet"]), isPublished: z2.number().int().min(0).max(1) });
 var quizInput = z2.object({ title: z2.string().min(2).max(255), section: z2.string().min(1).max(80), questions: z2.number().int().min(0).max(9999), isPublished: z2.number().int().min(0).max(1) });
 var fileInput = z2.object({ title: z2.string().min(2).max(255), kind: z2.string().min(1).max(80), size: z2.string().min(1).max(40), pages: z2.number().int().min(0).max(9999), downloadUrl: z2.string().optional().nullable(), isPublished: z2.number().int().min(0).max(1) });
+var videoInput = z2.object({ title: z2.string().min(2).max(255), description: z2.string().optional().nullable(), videoUrl: z2.string().min(1).refine((value) => value.startsWith("/") || /^https?:\/\//.test(value), "\u0623\u062F\u062E\u0644 \u0631\u0627\u0628\u0637 \u0641\u064A\u062F\u064A\u0648 \u0635\u062D\u064A\u062D"), thumbnailUrl: z2.string().min(1).refine((value) => value.startsWith("/") || /^https?:\/\//.test(value), "\u0623\u062F\u062E\u0644 \u0631\u0627\u0628\u0637 \u0635\u0648\u0631\u0629 \u0635\u062D\u064A\u062D").optional().nullable(), isPublished: z2.number().int().min(0).max(1) });
 var brandingInput = z2.object({ platformName: z2.string().min(2).max(120), logoUrl: z2.string().min(1), fontFamily: z2.string().min(2).max(120), primaryColor: z2.string().regex(/^#[0-9a-fA-F]{6}$/), backgroundColor: z2.string().regex(/^#[0-9a-fA-F]{6}$/), faviconUrl: z2.string().min(1) });
 var roleInput = z2.enum(["user", "platform_manager", "content_moderator", "support_moderator"]);
 var appRouter = router({
@@ -1067,12 +1080,17 @@ var appRouter = router({
     }),
     deleteQuiz: ownerProcedure.input(z2.object({ id: z2.number().int() })).mutation(({ input }) => deleteQuiz(input.id)),
     supportSummary: supportProcedure.query(() => getAllUsers()),
-    videos: ownerProcedure.query(() => listVideos()),
-    videoUploadTarget: ownerProcedure.input(z2.object({ fileName: z2.string().min(1).max(255), contentType: z2.string().max(120), size: z2.number().int().positive().max(500 * 1024 * 1024) })).mutation(({ input }) => {
+    videos: contentProcedure.query(() => listVideos()),
+    videoUploadTarget: contentProcedure.input(z2.object({ fileName: z2.string().min(1).max(255), contentType: z2.string().max(120), size: z2.number().int().positive().max(500 * 1024 * 1024) })).mutation(({ input }) => {
       const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-120) || "video";
       return cloudinaryCreateUpload(input.contentType || "video/mp4");
     }),
-    createVideo: ownerProcedure.input(z2.object({ title: z2.string().min(2), description: z2.string().optional().nullable(), videoUrl: z2.string().min(1).refine((value) => value.startsWith("/") || /^https?:\/\//.test(value), "\u0623\u062F\u062E\u0644 \u0631\u0627\u0628\u0637 \u0641\u064A\u062F\u064A\u0648 \u0635\u062D\u064A\u062D"), thumbnailUrl: z2.string().min(1).refine((value) => value.startsWith("/") || /^https?:\/\//.test(value), "\u0623\u062F\u062E\u0644 \u0631\u0627\u0628\u0637 \u0635\u0648\u0631\u0629 \u0635\u062D\u064A\u062D").optional().nullable(), isPublished: z2.number().int().min(0).max(1) })).mutation(({ input }) => createVideo(input)),
+    createVideo: contentProcedure.input(videoInput).mutation(({ input }) => createVideo(input)),
+    updateVideo: contentProcedure.input(videoInput.extend({ id: z2.number().int() })).mutation(({ input }) => {
+      const { id, ...data } = input;
+      return updateVideo(id, data);
+    }),
+    deleteVideo: contentProcedure.input(z2.object({ id: z2.number().int() })).mutation(({ input }) => deleteVideo(input.id)),
     visitStats: adminProcedure.query(() => getVisitStats()),
     visitLog: adminProcedure.query(() => listVisitLog()),
     resetVisits: ownerProcedure.mutation(() => resetVisitLog())
