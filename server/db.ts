@@ -8,8 +8,10 @@ const OWNER_EMAIL = "zdfga123456@gmail.com";
 let _db: ReturnType<typeof drizzle> | null = null; let seedPromise: Promise<void> | null = null;
 export async function getDb() { if (!_db && process.env.DATABASE_URL) { try { _db = drizzle(process.env.DATABASE_URL); } catch (error) { console.warn("[Database] Failed to connect:", error); _db = null; } } if (_db && !seedPromise) seedPromise = seedDatabase(_db).catch(error => console.warn("[Database] Seed skipped:", error)); if (seedPromise) await seedPromise; return _db; }
 async function seedDatabase(db: ReturnType<typeof drizzle>) {
-  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS resetToken VARCHAR(128) NULL`);
-  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS resetExpiresAt TIMESTAMP NULL`);
+  const [resetTokenRows] = await db.execute(sql`SELECT COUNT(*) AS count FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'resetToken'`) as any;
+  if (Number((resetTokenRows as any[])?.[0]?.count ?? 0) === 0) await db.execute(sql`ALTER TABLE users ADD COLUMN resetToken VARCHAR(128) NULL`);
+  const [resetExpiresRows] = await db.execute(sql`SELECT COUNT(*) AS count FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'resetExpiresAt'`) as any;
+  if (Number((resetExpiresRows as any[])?.[0]?.count ?? 0) === 0) await db.execute(sql`ALTER TABLE users ADD COLUMN resetExpiresAt TIMESTAMP NULL`);
   const [{ count: settingsCount }] = await db.select({ count: sql<number>`count(*)` }).from(platformSettings);
   if (Number(settingsCount) === 0) await db.insert(platformSettings).values({ platformName: "ALPHA", logoUrl: DEFAULT_LOGO, fontFamily: "IBM Plex Sans Arabic", primaryColor: "#f2c75d", backgroundColor: "#090b0e", faviconUrl: DEFAULT_LOGO });
   // Remove the legacy aggregate file requested by the owner and repair the demo file link.

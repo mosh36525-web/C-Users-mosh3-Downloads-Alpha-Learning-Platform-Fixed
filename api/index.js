@@ -166,8 +166,10 @@ async function getDb() {
   return _db;
 }
 async function seedDatabase(db) {
-  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS resetToken VARCHAR(128) NULL`);
-  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS resetExpiresAt TIMESTAMP NULL`);
+  const [resetTokenRows] = await db.execute(sql`SELECT COUNT(*) AS count FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'resetToken'`);
+  if (Number(resetTokenRows?.[0]?.count ?? 0) === 0) await db.execute(sql`ALTER TABLE users ADD COLUMN resetToken VARCHAR(128) NULL`);
+  const [resetExpiresRows] = await db.execute(sql`SELECT COUNT(*) AS count FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'resetExpiresAt'`);
+  if (Number(resetExpiresRows?.[0]?.count ?? 0) === 0) await db.execute(sql`ALTER TABLE users ADD COLUMN resetExpiresAt TIMESTAMP NULL`);
   const [{ count: settingsCount }] = await db.select({ count: sql`count(*)` }).from(platformSettings);
   if (Number(settingsCount) === 0) await db.insert(platformSettings).values({ platformName: "ALPHA", logoUrl: DEFAULT_LOGO, fontFamily: "IBM Plex Sans Arabic", primaryColor: "#f2c75d", backgroundColor: "#090b0e", faviconUrl: DEFAULT_LOGO });
   await db.delete(educationalFiles).where(sql`lower(${educationalFiles.title}) like '%مجمع%الفا%'`);
