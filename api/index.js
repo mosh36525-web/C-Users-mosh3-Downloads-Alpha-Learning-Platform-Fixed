@@ -6,6 +6,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 // shared/const.ts
 var COOKIE_NAME = "webdev_app_session";
 var ONE_YEAR_MS = 1e3 * 60 * 60 * 24 * 365;
+var FIVE_DAYS_MS = 1e3 * 60 * 60 * 24 * 5;
 var AXIOS_TIMEOUT_MS = 3e4;
 var UNAUTHED_ERR_MSG = "Please login (10001)";
 var NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
@@ -1045,8 +1046,8 @@ var appRouter = router({
       if (await getUserByEmail(input.email)) throw new Error("\u0647\u0630\u0627 \u0627\u0644\u0628\u0631\u064A\u062F \u0645\u0633\u062C\u0644 \u0628\u0627\u0644\u0641\u0639\u0644");
       const user = await createPasswordUser({ name: input.name, email: input.email, passwordHash: await hashPassword(input.password) });
       if (!user) throw new Error("\u062A\u0639\u0630\u0631 \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u062D\u0633\u0627\u0628");
-      const token = await sdk.createSessionToken(user.openId, { name: user.name ?? input.name });
-      ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: 31536e6 });
+      const token = await sdk.createSessionToken(user.openId, { name: user.name ?? input.name, expiresInMs: FIVE_DAYS_MS });
+      ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: FIVE_DAYS_MS });
       return user;
     }),
     login: publicProcedure.input(z2.object({ email: emailInput, password: passwordInput })).mutation(async ({ ctx, input }) => {
@@ -1054,8 +1055,8 @@ var appRouter = router({
       if (!user?.passwordHash || !await verifyPassword(input.password, user.passwordHash)) throw new Error("\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0623\u0648 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D\u0629");
       if (user.status === "suspended") throw new Error("\u0647\u0630\u0627 \u0627\u0644\u062D\u0633\u0627\u0628 \u0645\u0648\u0642\u0648\u0641");
       const signedIn = await markPasswordUserSignedIn(user.id);
-      const token = await sdk.createSessionToken(user.openId, { name: user.name ?? "" });
-      ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: 31536e6 });
+      const token = await sdk.createSessionToken(user.openId, { name: user.name ?? "", expiresInMs: FIVE_DAYS_MS });
+      ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: FIVE_DAYS_MS });
       return signedIn;
     }),
     requestPasswordReset: publicProcedure.input(z2.object({ email: emailInput })).mutation(async ({ input }) => {
@@ -1080,8 +1081,8 @@ var appRouter = router({
       const user = await getUserByResetToken(tokenHash);
       if (!user) throw new Error("\u0631\u0627\u0628\u0637 \u0627\u0644\u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D \u0623\u0648 \u0627\u0646\u062A\u0647\u062A \u0635\u0644\u0627\u062D\u064A\u062A\u0647");
       await updatePasswordFromReset(user.id, await hashPassword(input.password));
-      const session = await sdk.createSessionToken(user.openId, { name: user.name ?? "" });
-      ctx.res.cookie(COOKIE_NAME, session, { ...getSessionCookieOptions(ctx.req), maxAge: 31536e6 });
+      const session = await sdk.createSessionToken(user.openId, { name: user.name ?? "", expiresInMs: FIVE_DAYS_MS });
+      ctx.res.cookie(COOKIE_NAME, session, { ...getSessionCookieOptions(ctx.req), maxAge: FIVE_DAYS_MS });
       return { success: true };
     }),
     logout: publicProcedure.mutation(({ ctx }) => {
